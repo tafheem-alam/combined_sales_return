@@ -169,6 +169,7 @@ function open_sales_invoice_selector(frm) {
                     item_code: $chk.data('item-code'),
                     item_name: $chk.data('item-name') || "",
                     description: $chk.data('description'),
+                    uom: $chk.data('uom'),   // ✅ ADD THIS
                     qty: parseFloat($chk.data('qty')) || 0,
                     rate: parseFloat($chk.data('rate')) || 0,
                     amount: parseFloat($chk.data('amount')) || 0,
@@ -211,6 +212,10 @@ function open_sales_invoice_selector(frm) {
     load_invoice_items_html(dialog, frm);
 }
 
+// Safely escape text for HTML attribute (tooltips)
+function escape_attr(val) {
+    return frappe.utils.escape_html(val || "").replace(/"/g, "&quot;");
+}
 // Load and render invoice items
 let _is_loading_invoice_items = false;
 function load_invoice_items_html(dialog, frm) {
@@ -239,6 +244,7 @@ function load_invoice_items_html(dialog, frm) {
                         <col style="width:120px">
                         <col style="width:140px">
                         <col>
+                        <col style="width:70px">
                         <col style="width:80px">
                         <col style="width:80px">
                         <col style="width:100px">
@@ -249,6 +255,7 @@ function load_invoice_items_html(dialog, frm) {
                             <th>Invoice</th>
                             <th>Item Code</th>
                             <th>Description</th>
+                            <th>UOM</th>
                             <th style="text-align:right">Qty</th>
                             <th style="text-align:right">Rate</th>
                             <th style="text-align:right">Amount</th>
@@ -266,6 +273,7 @@ function load_invoice_items_html(dialog, frm) {
                 const dataVatRate = row.vat_rate_ratio || 0;
                 const dataVat = row.vat_amount || 0;
                 const dataQty = row.original_qty || row.qty || 0;
+                const safeUOM = frappe.utils.escape_html(row.uom || "");
 
                 // amount shown: server amount if present, else compute
                 const showLineAmount = round2(flt_js(row.amount || (dataQty * (row.rate || 0))));
@@ -280,6 +288,7 @@ function load_invoice_items_html(dialog, frm) {
                                 data-item-code="${safeItemCode}"
                                 data-item-name="${safeItemName}"
                                 data-description="${frappe.utils.escape_html(row.description||'')}"
+                                data-uom="${safeUOM}"
                                 data-qty="${dataQty}"
                                 data-rate="${row.rate || 0}"
                                 data-amount="${showLineAmount}"
@@ -291,6 +300,7 @@ function load_invoice_items_html(dialog, frm) {
                         <td style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${safeInvoice}</td>
                         <td style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${safeItemCode}</td>
                         <td style="word-break:break-word">${safeItemName ? safeItemName + " — " + safeDesc : safeDesc}</td>
+                        <td style="text-align:center" title="${escape_attr(row.uom)}">${safeUOM}</td>
                         <td style="text-align:right">${dataQty}</td>
                         <td style="text-align:right">${(row.rate || 0).toFixed(2)}</td>
                         <td style="text-align:right">${showLineAmount.toFixed(2)}</td>
@@ -348,17 +358,14 @@ function add_items_to_child_table(frm, items) {
             let row = frm.add_child("combined_sales_return_items");
 
             // decide canonical item code (must be exact Item code if Link)
-            const item_code_val = item.item_code || item.item || item.item_name || "";
-
-            //console.log(item_code_val)
+            const item_code_val = item.item_code || item.item || item.item_name || "";            
 
             // set both item and item_code if present
-            //if (has_item_field) {
-                frappe.model.set_value(row.doctype, row.name, "item", item_code_val);
-            //}
-            //if (has_item_code_field) {
-                frappe.model.set_value(row.doctype, row.name, "item_code", item_code_val);
-            //}
+           
+            frappe.model.set_value(row.doctype, row.name, "item", item_code_val);
+            
+            frappe.model.set_value(row.doctype, row.name, "item_code", item_code_val);
+            
 
             //console.log(has_item_code_field)
 
@@ -366,13 +373,13 @@ function add_items_to_child_table(frm, items) {
             if (has_item_name_field) {
                 frappe.model.set_value(row.doctype, row.name, "item_name", item.item_name || __("Loading..."));
             }
-
-            //console.log(has_item_name_field + "-" + item.item_name)
+            
             // set basic fields
             frappe.model.set_value(row.doctype, row.name, "linked_invoice", item.sales_invoice);
             frappe.model.set_value(row.doctype, row.name, "sales_invoice_item", item.invoice_item_row);
             frappe.model.set_value(row.doctype, row.name, "description", item.description || "");
 
+            frappe.model.set_value(row.doctype, row.name, "uom", item.uom);
             // quantities and rates
             const originalQty = flt_js(item.qty || item.original_qty || 0);
             frappe.model.set_value(row.doctype, row.name, "original_qty", originalQty);
@@ -387,19 +394,12 @@ function add_items_to_child_table(frm, items) {
             frappe.model.set_value(row.doctype, row.name, "rate", flt_js(item.rate || 0));
 
             // VAT fields
-            //if (has_vat_rate) {
+            
             frappe.model.set_value(row.doctype, row.name, "vat_rate_ratio", flt_js(item.vat_rate_ratio || 0));
-            // } else {
-            //     row._vat_rate_ratio = flt_js(item.vat_rate_ratio || 0);
-            // }
-
-            const invoice_vat = flt_js(item.vat_amount || 0);
-            //if (has_original_vat) {
+           
+            const invoice_vat = flt_js(item.vat_amount || 0);           
             frappe.model.set_value(row.doctype, row.name, "original_vat", invoice_vat);
-            // } else {
-            //     row._original_vat = invoice_vat;
-            // }
-
+            
             // compute initial vat and amounts
             const curQty = -Math.abs(desired || 0);
             let vatForReturn = 0;

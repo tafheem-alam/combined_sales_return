@@ -11,9 +11,12 @@
   "item_code",
   "description",
   "qty",
+  "uom",
   "max_returnable_qty",
+  "original_qty",
   "rate",
   "vat_amount",
+  "vat_rate_ratio",
   "total_amount"
  ],
  "fields": [
@@ -87,13 +90,35 @@
    "fieldtype": "Currency",
    "label": "Total Amount",
    "read_only": 1
+  },
+  {
+   "fieldname": "uom",
+   "fieldtype": "Link",
+   "label": "UOM",
+   "options": "UOM"
+  },
+  {
+   "fieldname": "original_qty",
+   "fieldtype": "Float",
+   "hidden": 1,
+   "in_list_view": 1,
+   "label": "Original Qty",
+   "read_only": 1
+  },
+  {
+   "fieldname": "vat_rate_ratio",
+   "fieldtype": "Float",
+   "hidden": 1,
+   "in_standard_filter": 1,
+   "label": "VAT Rate Ratio",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2025-12-11 17:36:12.410072",
+ "modified": "2025-12-16 08:28:46.842000",
  "modified_by": "Administrator",
  "module": "Combined Sales Return",
  "name": "Sales Return Item",

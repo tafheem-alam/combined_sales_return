@@ -94,7 +94,8 @@ def get_sales_invoice_items(customer=None, sales_invoice=None, select_all=0):
             sii.description,
             sii.qty,
             sii.rate,
-            sii.amount
+            sii.amount,
+            sii.uom
         FROM `tabSales Invoice Item` sii
         INNER JOIN `tabSales Invoice` si ON sii.parent = si.name
         WHERE
@@ -135,6 +136,7 @@ def get_sales_invoice_items(customer=None, sales_invoice=None, select_all=0):
         line_amount = (r.qty or 0) * (r.rate or 0)
         vat_amount = line_amount * vat_ratio
 
+        r["uom"] = r.uom 
         r["vat_rate_ratio"] = vat_ratio
         r["vat_amount"] = vat_amount
         r["original_qty"] = r.qty
@@ -188,7 +190,8 @@ def create_credit_notes(docname, submit_credit_notes=False):
             cn.append("items", {
                 "item_code": item.item_code,
                 "qty": qty,
-                "rate": item.rate
+                "rate": item.rate,
+                "uom": item.uom
             })
 
         # --------------------------------------------------
