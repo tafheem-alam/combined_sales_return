@@ -147,11 +147,75 @@ function open_sales_invoice_selector(frm) {
         title: "Select Sales Invoice Items",
         size: "large",
         fields: [
-            { label: "Customer", fieldname: "customer", fieldtype: "Link", options: "Customer", reqd: 1, default: frm.doc.customer, read_only: 1 },
-            { label: "Sales Invoice", fieldname: "sales_invoice", fieldtype: "Link", options: "Sales Invoice", depends_on: "eval:!doc.select_all" },
-            { label: "Fetch All Items from Customer Invoices", fieldname: "select_all", fieldtype: "Check" },
-            { label: "Invoice Items", fieldname: "invoice_items_html", fieldtype: "HTML" }
+            // -----------------------------
+            // Filters
+            // -----------------------------
+            {
+                fieldtype: "Section Break",
+                label: "Filters"
+            },
+
+            {
+                label: "Customer",
+                fieldname: "customer",
+                fieldtype: "Link",
+                options: "Customer",
+                reqd: 1,
+                default: frm.doc.customer,
+                read_only: 1
+            },
+
+            {
+                fieldtype: "Column Break"
+            },
+
+            {
+                label: "Sales Invoice",
+                fieldname: "sales_invoice",
+                fieldtype: "Link",
+                options: "Sales Invoice",
+                depends_on: "eval:!doc.select_all"
+            },
+
+            {
+                fieldtype: "Section Break"
+            },
+
+            {
+                label: "Item",
+                fieldname: "item_code",
+                fieldtype: "Link",
+                options: "Item",
+                //description: "Filter invoices by item"
+            },
+
+            {
+                fieldtype: "Column Break"
+            },
+
+            {
+                label: "Fetch All Items",
+                fieldname: "select_all",
+                fieldtype: "Check",
+                //description: "Ignore Sales Invoice filter",
+                default: 0
+            },
+
+            // -----------------------------
+            // Results
+            // -----------------------------
+            {
+                fieldtype: "Section Break",
+                label: "Invoice Items"
+            },
+
+            {
+                fieldname: "invoice_items_html",
+                fieldtype: "HTML"
+            }
         ],
+
+
         primary_action: function() {
             const $wrapper = dialog.fields_dict.invoice_items_html.$wrapper;
             const $checked = $wrapper.find('input.invoice-row-choose:checked');
@@ -196,19 +260,60 @@ function open_sales_invoice_selector(frm) {
     // show then bind input (some Frappe builds create $input only after show)
     dialog.show();
 
-    const debounced_load = debounce(() => {
-        if (!dialog || !dialog.fields_dict) return;
+    // Align checkbox vertically with link fields
+    setTimeout(() => {
+    const selectAllField = dialog.fields_dict.select_all;
+
+    if (selectAllField && selectAllField.$wrapper) {
+        selectAllField.$wrapper.find(".control-input").css({
+            marginTop: "22px"   // adjust as needed
+        });
+    }
+    }, 0);
+
+    /* --------------------------------------------------
+   🔥 ENLARGE DIALOG (NEAR FULL SCREEN)
+    -------------------------------------------------- */
+    dialog.$wrapper.find(".modal-dialog").css({
+        width: "80%",
+        maxWidth: "80%",
+        height: "80vh",
+        margin: "10px auto"
+    });
+
+    dialog.$wrapper.find(".modal-content").css({
+        height: "80vh"
+    });
+
+    dialog.$wrapper.find(".modal-body").css({
+        maxHeight: "calc(95vh - 120px)",
+        overflow: "auto"
+    });
+    // --------------------------------------------------
+    // 2️⃣ BIND onchange AFTER show()
+    // --------------------------------------------------
+
+    // Sales Invoice changed
+    dialog.fields_dict.sales_invoice.df.onchange = function () {
         load_invoice_items_html(dialog, frm);
-    }, 220);
+    };
 
-    // namespaced to avoid duplicate bindings
-    try { dialog.fields_dict.sales_invoice.$input.off('change.csr'); } catch (e) {}
-    dialog.fields_dict.sales_invoice.$input.on('change.csr', debounced_load);
+    // Item changed
+    dialog.fields_dict.item_code.df.onchange = function () {
+        if (dialog.get_value("item_code")) {
+            dialog.set_value("sales_invoice", null);
+        }
+        load_invoice_items_html(dialog, frm);
+    };
 
-    try { dialog.fields_dict.select_all.$input.off('change.csr'); } catch (e) {}
-    dialog.fields_dict.select_all.$input.on('change.csr', debounced_load);
+    // Fetch All toggle
+    dialog.fields_dict.select_all.df.onchange = function () {
+        load_invoice_items_html(dialog, frm);
+    };
 
-    // initial load
+    // --------------------------------------------------
+    // 3️⃣ INITIAL LOAD
+    // --------------------------------------------------
     load_invoice_items_html(dialog, frm);
 }
 
@@ -221,13 +326,23 @@ let _is_loading_invoice_items = false;
 function load_invoice_items_html(dialog, frm) {
     if (!dialog || !dialog.fields_dict || _is_loading_invoice_items) return;
     _is_loading_invoice_items = true;
-
-    const values = dialog.get_values();
+    
+    const customer = dialog.get_value("customer");
+    const sales_invoice = dialog.get_value("sales_invoice");
+    const select_all = dialog.get_value("select_all") ? 1 : 0;
+    const item_code = dialog.get_value("item_code"); // ✅ NEW
+    
     dialog.fields_dict.invoice_items_html.set_value(`<div style="padding:12px; min-height:120px">Loading...</div>`);
 
     frappe.call({
         method: "combined_sales_return.combined_sales_return.doctype.combined_sales_return.combined_sales_return.get_sales_invoice_items",
-        args: { customer: values.customer, sales_invoice: values.sales_invoice, select_all: values.select_all ? 1 : 0 },
+        //args: { customer: values.customer, sales_invoice: values.sales_invoice, select_all: values.select_all ? 1 : 0 },
+        args: {
+        customer: customer,
+        sales_invoice: sales_invoice,
+        select_all: select_all,
+        item_code: item_code   // ✅ PASS TO SERVER
+    },
         callback(r) {
             const rows = (r.message || []);
             if (!rows.length) {
@@ -237,13 +352,13 @@ function load_invoice_items_html(dialog, frm) {
             }
 
             let html = `
-                <div style="max-height:60vh; overflow:auto; padding:8px; min-height:200px;">
-                <table class="table table-bordered" style="width:100%; border-collapse:collapse; table-layout: fixed;">
-                    <colgroup>
+                <div style="max-height:75vh; overflow:auto; padding:8px; min-height:200px;">
+                <table class="table table-bordered" style="width:100%; min-width:1200px; table-layout: fixed;">
+                       <colgroup>
                         <col style="width:40px">
-                        <col style="width:120px">
-                        <col style="width:140px">
-                        <col>
+                        <col style="width:170px">
+                        <col style="width:150px">
+                        <col style="width:250px">
                         <col style="width:70px">
                         <col style="width:80px">
                         <col style="width:80px">

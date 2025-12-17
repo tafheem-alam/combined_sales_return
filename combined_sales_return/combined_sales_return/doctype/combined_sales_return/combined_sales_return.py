@@ -76,7 +76,7 @@ def get_invoice_vat_rate(invoice_name):
 # ----------------------------------------------------------------------
 
 @frappe.whitelist()
-def get_sales_invoice_items(customer=None, sales_invoice=None, select_all=0):
+def get_sales_invoice_items(customer=None, sales_invoice=None, select_all=0, item_code=None):
     """
     Fetch Sales Invoice Items and attach VAT info from Taxes table
     """
@@ -86,34 +86,47 @@ def get_sales_invoice_items(customer=None, sales_invoice=None, select_all=0):
     select_all = cint(select_all)
 
     sql = """
-        SELECT
-            sii.parent AS sales_invoice,
-            sii.name AS invoice_item_row,
-            sii.item_code,
-            sii.item_name,
-            sii.description,
-            sii.qty,
-            sii.rate,
-            sii.amount,
-            sii.uom
-        FROM `tabSales Invoice Item` sii
-        INNER JOIN `tabSales Invoice` si ON sii.parent = si.name
-        WHERE
-            si.docstatus = 1
-            AND si.is_return = 0
+    SELECT
+        sii.parent AS sales_invoice,
+        sii.name AS invoice_item_row,
+        sii.item_code,
+        sii.item_name,
+        sii.description,
+        sii.qty,
+        sii.rate,
+        sii.amount,
+        sii.uom
+    FROM `tabSales Invoice Item` sii
+    INNER JOIN `tabSales Invoice` si ON sii.parent = si.name
+    WHERE
+        si.docstatus = 1
+        AND si.is_return = 0
     """
 
     params = {"customer": customer}
 
-    if select_all:
+    # Case 1: Item filter is applied → search ALL invoices of customer
+    if item_code:
         sql += " AND si.customer = %(customer)s"
+
+    # Case 2: Explicitly fetch all invoices
+    elif select_all:
+        sql += " AND si.customer = %(customer)s"
+
+    # Case 3: Specific invoice selected
     else:
         if not sales_invoice:
             return []
         sql += " AND si.name = %(sales_invoice)s"
         params["sales_invoice"] = sales_invoice
 
-    sql += " ORDER BY si.posting_date DESC"
+    # ----------------------------------------
+    # Item filter (ALWAYS by item_code)
+    # ----------------------------------------
+    if item_code:
+        sql += " AND sii.item_code = %(item_code)s"
+        params["item_code"] = item_code
+        sql += " ORDER BY si.posting_date DESC"
 
     rows = frappe.db.sql(sql, params, as_dict=True)
 
@@ -150,7 +163,6 @@ def get_sales_invoice_items(customer=None, sales_invoice=None, select_all=0):
 # ----------------------------------------------------------------------
 
 @frappe.whitelist()
-@frappe.whitelist()
 def create_credit_notes(docname, submit_credit_notes=False):
     """
     Create Credit Notes grouped by Linked Invoice
@@ -176,7 +188,7 @@ def create_credit_notes(docname, submit_credit_notes=False):
             "return_against": original_si.name,
             "posting_date": frappe.utils.nowdate(),
             "taxes_and_charges": original_si.taxes_and_charges,
-            "combined_sales_return": doc.name,
+            #"combined_sales_return": doc.name,
             "items": [],
             "taxes": []
         })
