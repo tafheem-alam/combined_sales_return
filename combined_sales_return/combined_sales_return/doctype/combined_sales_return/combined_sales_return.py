@@ -96,12 +96,14 @@ def get_sales_invoice_items(customer=None, sales_invoice=None, select_all=0, ite
         sii.rate,
         sii.amount,
         sii.uom,
-        si.territory
+        sii.territory AS territory
     FROM `tabSales Invoice Item` sii
     INNER JOIN `tabSales Invoice` si ON sii.parent = si.name
     WHERE
         si.docstatus = 1
         AND si.is_return = 0
+
+
     """
 
     params = {"customer": customer}
@@ -131,7 +133,7 @@ def get_sales_invoice_items(customer=None, sales_invoice=None, select_all=0, ite
 
     rows = frappe.db.sql(sql, params, as_dict=True)
 
-    #frappe.msgprint(f"Rows {rows}")
+    frappe.msgprint(f"Rows {rows}")
 
     # ----------------------------------------------------------
     # Attach VAT rate & VAT amount PER ITEM (derived correctly)
